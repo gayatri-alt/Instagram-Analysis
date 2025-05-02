@@ -1,0 +1,268 @@
+1. How many unique post types are found in the 'fact_content' table? 
+SELECT COUNT(DISTINCT post_type) AS unique_post_types
+    -> FROM fact_content;
++-------------------+
+| unique_post_types |
++-------------------+
+|                 4 |
+
+2. What are the highest and lowest recorded impressions for each post 
+type? 
+ select post_type, max(impressions), min(impressions) from fact_content group by post_type;
++-------------+------------------+------------------+
+| post_type   | max(impressions) | min(impressions) |
++-------------+------------------+------------------+
+| IG Image    |           129694 |            23367 |
+| IG Reel     |           339708 |            87570 |
+| IG Carousel |             9677 |             3264 |
+| IG Video    |            73321 |             8741 |
++-------------+------------------+------------------+
+4 rows in set (0.00 sec)
+
+3. Filter all the posts that were published on a weekend in the month of 
+March and April and export them to a separate csv file.
+  SELECT *
+FROM fact_content
+WHERE 
+    (DAYOFWEEK(date) IN (1, 7))  -- 1 = Sunday, 7 = Saturday
+    AND (MONTH(date) IN (3, 4))   -- March (3) and April (4)
+;
+
+4. Create a report to get the statistics for the account. The final output 
+includes the following fields: 
+• month_name 
+• total_profile_visits 
+• total_new_followers 
+select (date) as month_name, sum(profile_visits) astotal_profile_visits, sum(new_followers) as total_new_followers from fact_account group by date order by date;
+
+
+5. Write a CTE that calculates the total number of 'likes’ for each 
+'post_category' during the month of 'July' and subsequently, arrange the 
+'post_category' values in descending order according to their total likes. 
+WITH category_likes AS (
+    SELECT 
+        post_category,
+        SUM(likes) AS total_likes
+    FROM 
+        fact_content
+    WHERE 
+        MONTH(date) = 7
+    GROUP BY 
+        post_category
+)
+SELECT 
+    post_category,
+    total_likes
+FROM 
+    category_likes
+ORDER BY 
+    total_likes DESC;
++---------------+-------------+
+| post_category | total_likes |
++---------------+-------------+
+| Other Gadgets |       26519 |
+| Tech Tips     |       20296 |
+| Mobile        |       16338 |
+| Earphone      |       14435 |
+| Smartwatch    |        3918 |
++---------------+-------------+
+5 rows in set (0.00 sec)
+
+6. Create a report that displays the unique post_category names alongside 
+their respective counts for each month. The output should have three 
+columns:  
+• month_name 
+• post_category_names  
+• post_category_count 
+Example:  
+• 'April', 'Earphone,Laptop,Mobile,Other Gadgets,Smartwatch', '5' 
+• 'February', 'Earphone,Laptop,Mobile,Smartwatch', '4' 
+SELECT
+       MONTHNAME(date) AS month_name,
+         GROUP_CONCAT(DISTINCT post_category ORDER BY post_category) AS post_category_names,
+        COUNT(DISTINCT post_category) AS post_category_count
+    FROM
+       fact_content
+    GROUP BY
+        MONTH(date), MONTHNAME(date)
+     ORDER BY
+        MONTH(date);
++------------+-----------------------------------------------------------+---------------------+
+| month_name | post_category_names                                       | post_category_count |
++------------+-----------------------------------------------------------+---------------------+
+| January    | Earphone,Mobile,Smartwatch                                |                   3 |
+| February   | Earphone,Laptop,Mobile,Smartwatch                         |                   4 |
+| March      | Earphone,Laptop,Mobile,Smartwatch                         |                   4 |
+| April      | Earphone,Laptop,Mobile,Other Gadgets,Smartwatch           |                   5 |
+| May        | Earphone,Laptop,Mobile,Other Gadgets,Smartwatch,Tech Tips |                   6 |
+| June       | Mobile,Other Gadgets,Smartwatch,Tech Tips                 |                   4 |
+| July       | Earphone,Mobile,Other Gadgets,Smartwatch,Tech Tips        |                   5 |
+| August     | Earphone,Mobile,Other Gadgets,Smartwatch,Tech Tips        |                   5 |
+| September  | Mobile,Other Gadgets,Smartwatch,Tech Tips                 |                   4 |
++------------+-----------------------------------------------------------+---------------------+
+9 rows in set (0.10 sec)
+
+7. What is the percentage breakdown of total reach by post type?  The final 
+output includes the following fields: 
+• post_type 
+• total_reach 
+• reach_percentage 
+ WITH reach_summary AS (
+    ->     SELECT
+    ->         post_type,
+    ->         SUM(reach) AS total_reach
+    ->     FROM
+    ->         fact_content
+    ->     GROUP BY
+    ->         post_type
+    -> ),
+    -> total_reach_cte AS (
+    ->     SELECT
+    ->         SUM(total_reach) AS overall_reach
+    ->     FROM
+    ->         reach_summary
+    -> )
+    -> SELECT
+    ->     rs.post_type,
+    ->     rs.total_reach,
+    ->     ROUND((rs.total_reach / tr.overall_reach) * 100, 2) AS reach_percentage
+    -> FROM
+    ->     reach_summary rs, total_reach_cte tr
+    -> ORDER BY
+    ->     reach_percentage DESC;
++-------------+-------------+------------------+
+| post_type   | total_reach | reach_percentage |
++-------------+-------------+------------------+
+| IG Reel     |     5379091 |            61.63 |
+| IG Image    |     1866381 |            21.38 |
+| IG Video    |     1422300 |            16.30 |
+| IG Carousel |       60465 |             0.69 |
++-------------+-------------+------------------+
+
+
+8. Create a report that includes the quarter, total comments, and total 
+saves recorded for each post category. Assign the following quarter 
+groupings: 
+(January, February, March) → “Q1” 
+(April, May, June) → “Q2” 
+(July, August, September) → “Q3” 
+The final output columns should consist of: 
+• post_category 
+• quarter 
+• total_comments 
+• total_saves 
+SELECT
+    ->     post_category,
+    ->     CASE
+    ->         WHEN MONTH(date) IN (1, 2, 3) THEN 'Q1'
+    ->         WHEN MONTH(date) IN (4, 5, 6) THEN 'Q2'
+    ->         WHEN MONTH(date) IN (7, 8, 9) THEN 'Q3'
+    ->     END AS quarter,
+    ->     SUM(comments) AS total_comments,
+    ->     SUM(saves) AS total_saves
+    -> FROM
+    ->     fact_content
+    -> WHERE
+    ->     MONTH(date) BETWEEN 1 AND 9
+    -> GROUP BY
+    ->     post_category, quarter
+    -> ORDER BY
+    ->     quarter, post_category;
++---------------+---------+----------------+-------------+
+| post_category | quarter | total_comments | total_saves |
++---------------+---------+----------------+-------------+
+| Earphone      | Q1      |            351 |        2230 |
+| Laptop        | Q1      |            418 |        2837 |
+| Mobile        | Q1      |           1836 |        9843 |
+| Smartwatch    | Q1      |            600 |        2860 |
+| Earphone      | Q2      |            589 |        3602 |
+| Laptop        | Q2      |            452 |        2248 |
+| Mobile        | Q2      |           2313 |       17207 |
+| Other Gadgets | Q2      |           1622 |       12041 |
+| Smartwatch    | Q2      |           1358 |       12581 |
+| Tech Tips     | Q2      |           2201 |       17649 |
+| Earphone      | Q3      |            427 |        3247 |
+| Mobile        | Q3      |           1134 |        5285 |
+| Other Gadgets | Q3      |            964 |        4457 |
+| Smartwatch    | Q3      |            971 |        3326 |
+| Tech Tips     | Q3      |           1596 |       12976 |
++---------------+---------+----------------+-------------+
+15 rows in set (0.04 sec)
+
+9. List the top three dates in each month with the highest number of new 
+followers. The final output should include the following columns: 
+• month 
+• date 
+• new_followers 
+WITH ranked_followers AS (
+    ->     SELECT
+    ->         DATE_FORMAT(date, '%M') AS month,
+    ->         date,
+    ->         new_followers,
+    ->         RANK() OVER (
+    ->             PARTITION BY MONTH(date)
+    ->             ORDER BY new_followers DESC
+    ->         ) AS rank_value
+    ->     FROM
+    ->         fact_account
+    -> )
+    -> SELECT
+    ->     month,
+    ->     date,
+    ->     new_followers
+    -> FROM
+    ->     ranked_followers
+    -> WHERE
+    ->     rank_value <= 3
+    -> ORDER BY
+    ->     MONTH(date), rank_value;
++-----------+------------+---------------+
+| month     | date       | new_followers |
++-----------+------------+---------------+
+| January   | 2023-01-30 |          3186 |
+| January   | 2023-01-03 |          2959 |
+| January   | 2023-01-23 |          1003 |
+| February  | 2023-02-01 |          4106 |
+| February  | 2023-02-24 |          2383 |
+| February  | 2023-02-02 |          1989 |
+| March     | 2023-03-21 |          5421 |
+| March     | 2023-03-28 |          2513 |
+| March     | 2023-03-25 |          2356 |
+| April     | 2023-04-25 |          3736 |
+| April     | 2023-04-30 |          2753 |
+| April     | 2023-04-06 |          2500 |
+| May       | 2023-05-08 |          8872 |
+| May       | 2023-05-20 |          6169 |
+| May       | 2023-05-12 |          6051 |
+| June      | 2023-06-30 |          8804 |
+| June      | 2023-06-03 |          8802 |
+| June      | 2023-06-21 |          7033 |
+| July      | 2023-07-08 |          3716 |
+| July      | 2023-07-15 |          3364 |
+| July      | 2023-07-28 |          2344 |
+| August    | 2023-08-23 |          2074 |
+| August    | 2023-08-21 |          1783 |
+| August    | 2023-08-06 |          1687 |
+| September | 2023-09-16 |          3849 |
+| September | 2023-09-22 |          3570 |
+| September | 2023-09-21 |          2285 |
++-----------+------------+---------------+
+27 rows in set (0.01 sec)
+
+10.  Create a stored procedure that takes the 'Week_no' as input and 
+generates a report displaying the total shares for each 'Post_type'. The 
+output of the procedure should consist of two columns: 
+• post_type 
+• total_shares 
+CREATE DEFINER=`root`@`localhost` PROCEDURE `GetShares`(IN input int)
+BEGIN
+select
+post_type,
+sum(shares) as total_shares
+from
+  fact_content
+  where
+     week(date) = input
+  group by
+  post_type;
+END
